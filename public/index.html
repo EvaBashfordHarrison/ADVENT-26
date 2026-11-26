@@ -1,0 +1,70 @@
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBP Advent Calendar '26</title>
+    <link rel="stylesheet" type="text/css" href="css/stylesheet.css">
+</head>
+
+<body>
+    <main class="landing-page">
+        <div class="marquee">
+            <div class="marquee-track">
+                <span>PLEASE WAIT FOR TODAY'S QUESTION • MERRY CHRISTMAS FROM DBP • PLEASE WAIT FOR TODAY'S QUESTION • MERRY CHRISTMAS FROM DBP • </span>
+                <span aria-hidden="true">PLEASE WAIT FOR TODAY'S QUESTION</span>
+            </div>
+        </div>
+
+        <video class="landing-video" autoplay="" muted="" loop="" playsinline="" preload="auto">
+            <source src="images/EVA-ADAM.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+
+        <a class="btn start-button is-disabled" aria-disabled="true">
+            Today's <br>question
+        </a>
+    </main>
+
+    <script>
+    // Same configuration as question.html
+    const POLL_MS = 8000; // how often to check for a live question
+
+    const startBtn = document.querySelector('.start-button');
+
+    // True if at least one record is marked "Show Photo" and has a video attached
+    async function hasLiveQuestion() {
+        const response = await fetch('/api/live-question');
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        const data = await response.json();
+        return data.live;
+    }
+
+    function setButtonState(isLive) {
+        if (isLive) {
+            startBtn.href = 'question.html';
+            startBtn.classList.remove('is-disabled');
+            startBtn.removeAttribute('aria-disabled');
+            startBtn.textContent = "Today's Advent question";
+        } else {
+            startBtn.removeAttribute('href');
+            startBtn.classList.add('is-disabled');
+            startBtn.setAttribute('aria-disabled', 'true');
+            startBtn.textContent = 'Question not live yet';
+        }
+    }
+
+    async function refreshButton() {
+        try {
+            setButtonState(await hasLiveQuestion());
+        } catch (error) {
+            // If Airtable can't be reached, keep the button disabled
+            console.error('Could not check for a live question:', error);
+            setButtonState(false);
+        }
+    }
+
+    refreshButton();
+    setInterval(refreshButton, POLL_MS);
+</script>
+
+
+</body></html>

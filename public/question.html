@@ -1,0 +1,175 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Today's Question</title>
+    <link rel="stylesheet" type="text/css" href="css/stylesheet.css">
+</head>
+
+<body class="question-page">
+    <main class="page">
+        <section class="calendar" id="calendar" aria-label="Advent calendar"></section>
+
+        <section class="frame-wrap">
+            <p class="frame-label" id="frameLabel">Frame</p>
+
+            <div class="frame">
+                <div class="media">
+                    <video id="dayVideo" controls playsinline preload="metadata" hidden></video>
+                    <p id="noVideo" class="empty" hidden>No question for today yet.</p>
+                </div>
+
+                <form id="answerForm" class="answer-form">
+                    <input type="hidden" id="dayField" name="day" value="">
+
+                    <input type="text" name="answer" placeholder="Type answer here..." required>
+                    <input type="text" name="name" placeholder="Name.." required>
+
+                    <button type="submit" class="btn submit-btn" id="submitBtn">SUBMIT</button>
+                    <p class="status" id="status" role="status"></p>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ---------- Configuration ----------
+
+        // Leave as null for the real date. Set to a number (e.g. 10) to test a specific day.
+        const DAY_OVERRIDE = null;
+
+        // ---------- Setup ----------
+        const today = getToday();
+        const calendarEl = document.getElementById('calendar');
+        const videoEl = document.getElementById('dayVideo');
+        const noVideoEl = document.getElementById('noVideo');
+        const form = document.getElementById('answerForm');
+        const dayField = document.getElementById('dayField');
+        const frameLabelEl = document.getElementById('frameLabel');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusEl = document.getElementById('status');
+        
+
+    // ---------- Calendar ----------
+
+    // Returns today's day number, or the test override if one is set
+    function getToday() {
+        return DAY_OVERRIDE ?? new Date().getDate();
+    }
+
+    // Creates the 25 circles once, in the Advent layout
+    function buildCalendar() {
+        for (let day = 1; day <= 25; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'day';
+            cell.dataset.day = day;
+            cell.textContent = day;
+
+            // Rows fill from the bottom up, 4 per row. 25 sits top-right.
+            cell.style.gridRow = day === 25 ? 1 : 7 - Math.floor((day - 1) / 4);
+            cell.style.gridColumn = day === 25 ? 4 : ((day - 1) % 4) + 1;
+
+            calendarEl.appendChild(cell);
+        }
+    }
+
+    // Lights every circle from 1 up to the given day.
+    // Each circle lights a moment after the one before it.
+    function illuminateCalendar(currentDay = today) {
+        document.querySelectorAll('.day').forEach(cell => {
+            const day = Number(cell.dataset.day);
+            const isLit = day <= currentDay;
+
+            cell.classList.toggle('lit', isLit);
+            cell.style.setProperty('--delay', `${(day - 1) * 80}ms`);
+
+            if (isLit) {
+                cell.setAttribute('aria-current', day === currentDay ? 'date' : 'true');
+            } else {
+                cell.removeAttribute('aria-current');
+            }
+        });
+    }
+
+        // Gets every record marked "Show Photo", the same way the old site did.
+        // async function fetchShownRecords() {
+        //     const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}` +
+        //         `?filterByFormula=${encodeURIComponent('{Show Photo}')}`;
+
+        //     const response = await fetch(url, {
+        //         headers: { Authorization: `Bearer ${apiKey}` }
+        //     });
+
+        //     if (!response.ok) {
+        //         throw new Error(`Airtable request failed (${response.status})`);
+        //     }
+
+        //     const data = await response.json();
+        //     return data.records;
+        // }
+
+        // Finds today's video. If the table has a "Day" field, match on it.
+        // Otherwise, use the first record marked "Show Photo".
+        async function fetchTodaysQuestion() {
+            const response = await fetch('/api/live-question');
+            if (!response.ok) throw new Error(`Request failed (${response.status})`);
+
+            const data = await response.json();
+            return data.live ? { videoUrl: data.videoUrl, label: data.label } : null;
+        }
+
+        async function loadQuestion() {
+            dayField.value = today;
+            try {
+                const question = await fetchTodaysQuestion();
+
+                if (question) {
+                    videoEl.src = question.videoUrl;
+                    videoEl.hidden = false;
+                    frameLabelEl.textContent = question.label;
+                    noVideoEl.hidden = true;
+                } else {
+                    noVideoEl.hidden = false;
+                }
+            } catch (error) {
+                console.error(error);
+                noVideoEl.textContent = "Couldn't load today's question. Please refresh.";
+                noVideoEl.hidden = false;
+            }
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            submitBtn.disabled = true;
+            statusEl.textContent = 'Submitting...';
+
+            try {
+                const response = await fetch('/api/answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.fromEntries(new FormData(form)))
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                statusEl.textContent = 'Submitted! Thanks for playing 🎄';
+
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1500);
+            } catch (error) {
+                console.error('Submission error:', error);
+                statusEl.textContent = 'Something went wrong. Please try again.';
+                submitBtn.disabled = false;
+            }
+        });
+
+        buildCalendar();
+        illuminateCalendar(today);
+        loadQuestion();
+    </script>
+</body>
+
+</html>
